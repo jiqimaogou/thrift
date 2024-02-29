@@ -69,6 +69,8 @@
 #include "thrifty.hh"
 #endif
 
+int g_processing_struct = 0;
+
 void thrift_reserved_keyword(char* keyword) {
   yyerror("Cannot use reserved language keyword: \"%s\"\n", keyword);
   exit(1);
@@ -127,7 +129,17 @@ literal_begin (['\"])
 {comment}            { /* do nothing */                 }
 {unixcomment}        { /* do nothing */                 }
 
-{symbol}             { return yytext[0];                }
+{symbol}             {
+  if (g_processing_struct) {
+    if (yytext[0] == '{') {
+      g_processing_struct++;
+    } else if (yytext[0] == '}') {
+      g_processing_struct--;
+      if (g_processing_struct == 1) g_processing_struct = 0;
+    }
+  }
+  return yytext[0];
+}
 "*"                  { return yytext[0];                }
 
 "false"              { yylval.iconst=0; return tok_int_constant; }
@@ -175,12 +187,12 @@ literal_begin (['\"])
 "set"                { return tok_set;                  }
 "oneway"             { return tok_oneway;               }
 "typedef"            { return tok_typedef;              }
-"struct"             { return tok_struct;               }
+"struct"             { g_processing_struct = 1; return tok_struct; }
 "union"              { return tok_union;                }
 "exception"          { return tok_xception;             }
 "extends"            { return tok_extends;              }
 "throws"             { return tok_throws;               }
-"service"            { return tok_service;              }
+"service"            { if (g_processing_struct) { REJECT; } else { return tok_service; } }
 "enum"               { return tok_enum;                 }
 "const"              { return tok_const;                }
 "required"           { return tok_required;             }
@@ -192,111 +204,111 @@ literal_begin (['\"])
 "&"                  { return tok_reference;            }
 
 
-"BEGIN"              { thrift_reserved_keyword(yytext); }
-"END"                { thrift_reserved_keyword(yytext); }
-"__CLASS__"          { thrift_reserved_keyword(yytext); }
-"__DIR__"            { thrift_reserved_keyword(yytext); }
-"__FILE__"           { thrift_reserved_keyword(yytext); }
-"__FUNCTION__"       { thrift_reserved_keyword(yytext); }
-"__LINE__"           { thrift_reserved_keyword(yytext); }
-"__METHOD__"         { thrift_reserved_keyword(yytext); }
-"__NAMESPACE__"      { thrift_reserved_keyword(yytext); }
-"abstract"           { thrift_reserved_keyword(yytext); }
-"alias"              { thrift_reserved_keyword(yytext); }
-"and"                { thrift_reserved_keyword(yytext); }
-"args"               { thrift_reserved_keyword(yytext); }
-"as"                 { thrift_reserved_keyword(yytext); }
-"assert"             { thrift_reserved_keyword(yytext); }
-"begin"              { thrift_reserved_keyword(yytext); }
-"break"              { thrift_reserved_keyword(yytext); }
-"case"               { thrift_reserved_keyword(yytext); }
-"catch"              { thrift_reserved_keyword(yytext); }
-"class"              { thrift_reserved_keyword(yytext); }
-"clone"              { thrift_reserved_keyword(yytext); }
-"continue"           { thrift_reserved_keyword(yytext); }
-"declare"            { thrift_reserved_keyword(yytext); }
-"def"                { thrift_reserved_keyword(yytext); }
-"default"            { thrift_reserved_keyword(yytext); }
-"del"                { thrift_reserved_keyword(yytext); }
-"delete"             { thrift_reserved_keyword(yytext); }
-"do"                 { thrift_reserved_keyword(yytext); }
-"dynamic"            { thrift_reserved_keyword(yytext); }
-"elif"               { thrift_reserved_keyword(yytext); }
-"else"               { thrift_reserved_keyword(yytext); }
-"elseif"             { thrift_reserved_keyword(yytext); }
-"elsif"              { thrift_reserved_keyword(yytext); }
-"end"                { thrift_reserved_keyword(yytext); }
-"enddeclare"         { thrift_reserved_keyword(yytext); }
-"endfor"             { thrift_reserved_keyword(yytext); }
-"endforeach"         { thrift_reserved_keyword(yytext); }
-"endif"              { thrift_reserved_keyword(yytext); }
-"endswitch"          { thrift_reserved_keyword(yytext); }
-"endwhile"           { thrift_reserved_keyword(yytext); }
-"ensure"             { thrift_reserved_keyword(yytext); }
-"except"             { thrift_reserved_keyword(yytext); }
-"exec"               { thrift_reserved_keyword(yytext); }
-"finally"            { thrift_reserved_keyword(yytext); }
-"float"              { thrift_reserved_keyword(yytext); }
-"for"                { thrift_reserved_keyword(yytext); }
-"foreach"            { thrift_reserved_keyword(yytext); }
-"from"               { thrift_reserved_keyword(yytext); }
-"function"           { thrift_reserved_keyword(yytext); }
-"global"             { thrift_reserved_keyword(yytext); }
-"goto"               { thrift_reserved_keyword(yytext); }
-"if"                 { thrift_reserved_keyword(yytext); }
-"implements"         { thrift_reserved_keyword(yytext); }
-"import"             { thrift_reserved_keyword(yytext); }
-"in"                 { thrift_reserved_keyword(yytext); }
-"inline"             { thrift_reserved_keyword(yytext); }
-"instanceof"         { thrift_reserved_keyword(yytext); }
-"interface"          { thrift_reserved_keyword(yytext); }
-"is"                 { thrift_reserved_keyword(yytext); }
-"lambda"             { thrift_reserved_keyword(yytext); }
-"module"             { thrift_reserved_keyword(yytext); }
-"native"             { thrift_reserved_keyword(yytext); }
-"new"                { thrift_reserved_keyword(yytext); }
-"next"               { thrift_reserved_keyword(yytext); }
-"nil"                { thrift_reserved_keyword(yytext); }
-"not"                { thrift_reserved_keyword(yytext); }
-"or"                 { thrift_reserved_keyword(yytext); }
-"package"            { thrift_reserved_keyword(yytext); }
-"pass"               { thrift_reserved_keyword(yytext); }
-"public"             { thrift_reserved_keyword(yytext); }
-"print"              { thrift_reserved_keyword(yytext); }
-"private"            { thrift_reserved_keyword(yytext); }
-"protected"          { thrift_reserved_keyword(yytext); }
-"public"             { thrift_reserved_keyword(yytext); }
-"raise"              { thrift_reserved_keyword(yytext); }
-"redo"               { thrift_reserved_keyword(yytext); }
-"rescue"             { thrift_reserved_keyword(yytext); }
-"retry"              { thrift_reserved_keyword(yytext); }
-"register"           { thrift_reserved_keyword(yytext); }
-"return"             { thrift_reserved_keyword(yytext); }
-"self"               { thrift_reserved_keyword(yytext); }
-"sizeof"             { thrift_reserved_keyword(yytext); }
-"static"             { thrift_reserved_keyword(yytext); }
-"super"              { thrift_reserved_keyword(yytext); }
-"switch"             { thrift_reserved_keyword(yytext); }
-"synchronized"       { thrift_reserved_keyword(yytext); }
-"then"               { thrift_reserved_keyword(yytext); }
-"this"               { thrift_reserved_keyword(yytext); }
-"throw"              { thrift_reserved_keyword(yytext); }
-"transient"          { thrift_reserved_keyword(yytext); }
-"try"                { thrift_reserved_keyword(yytext); }
-"undef"              { thrift_reserved_keyword(yytext); }
-"union"              { thrift_reserved_keyword(yytext); }
-"unless"             { thrift_reserved_keyword(yytext); }
-"unsigned"           { thrift_reserved_keyword(yytext); }
-"until"              { thrift_reserved_keyword(yytext); }
-"use"                { thrift_reserved_keyword(yytext); }
-"var"                { thrift_reserved_keyword(yytext); }
-"virtual"            { thrift_reserved_keyword(yytext); }
-"volatile"           { thrift_reserved_keyword(yytext); }
-"when"               { thrift_reserved_keyword(yytext); }
-"while"              { thrift_reserved_keyword(yytext); }
-"with"               { thrift_reserved_keyword(yytext); }
-"xor"                { thrift_reserved_keyword(yytext); }
-"yield"              { thrift_reserved_keyword(yytext); }
+"BEGIN"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"END"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__CLASS__"          { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__DIR__"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__FILE__"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__FUNCTION__"       { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__LINE__"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__METHOD__"         { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"__NAMESPACE__"      { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"abstract"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"alias"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"and"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"args"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"as"                 { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"assert"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"begin"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"break"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"case"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"catch"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"class"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"clone"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"continue"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"declare"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"def"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"default"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"del"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"delete"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"do"                 { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"dynamic"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"elif"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"else"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"elseif"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"elsif"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"end"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"enddeclare"         { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"endfor"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"endforeach"         { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"endif"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"endswitch"          { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"endwhile"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"ensure"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"except"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"exec"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"finally"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"float"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"for"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"foreach"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"from"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"function"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"global"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"goto"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"if"                 { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"implements"         { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"import"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"in"                 { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"inline"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"instanceof"         { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"interface"          { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"is"                 { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"lambda"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"module"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"native"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"new"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"next"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"nil"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"not"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"or"                 { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"package"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"pass"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"public"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"print"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"private"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"protected"          { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"public"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"raise"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"redo"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"rescue"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"retry"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"register"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"return"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"self"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"sizeof"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"static"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"super"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"switch"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"synchronized"       { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"then"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"this"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"throw"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"transient"          { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"try"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"undef"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"union"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"unless"             { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"unsigned"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"until"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"use"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"var"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"virtual"            { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"volatile"           { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"when"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"while"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"with"               { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"xor"                { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
+"yield"              { if (g_processing_struct) { REJECT; } else { thrift_reserved_keyword(yytext); } }
 
 {intconstant} {
   errno = 0;
