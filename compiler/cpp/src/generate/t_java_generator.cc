@@ -295,6 +295,7 @@ public:
    */
 
   std::string java_package();
+  std::string get_namespace(t_program* program);
   std::string java_type_imports();
   std::string java_suppressions();
   std::string type_name(t_type* ttype,
@@ -366,7 +367,7 @@ private:
 void t_java_generator::init_generator() {
   // Make output directory
   MKDIR(get_out_dir().c_str());
-  package_name_ = program_->get_namespace("java");
+  package_name_ = get_namespace(program_);
 
   string dir = package_name_;
   string subdir = get_out_dir();
@@ -394,6 +395,23 @@ string t_java_generator::java_package() {
     return string("package ") + package_name_ + ";\n\n";
   }
   return "";
+}
+
+/**
+ * Gets the namespace for a program, or returns a default value if not set.
+ * 
+ * @param program The program to get the namespace for
+ * @return The namespace, or a default value if not set
+ */
+std::string t_java_generator::get_namespace(t_program* program) {
+  std::string ns = program->get_namespace("java");
+  if (ns.empty()) {
+    ns = program->get_namespace("go");
+  }
+  if (ns.empty()) {
+    ns = "thrift";
+  }
+  return ns;
 }
 
 /**
@@ -718,7 +736,7 @@ string t_java_generator::render_const_value(ofstream& out, t_type* type, t_const
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    std::string namespace_prefix = type->get_program()->get_namespace("java");
+    std::string namespace_prefix = get_namespace(type->get_program());
     if (namespace_prefix.length() > 0) {
       namespace_prefix += ".";
     }
@@ -4014,7 +4032,7 @@ string t_java_generator::type_name(t_type* ttype,
   // Check for namespacing
   t_program* program = ttype->get_program();
   if ((program != NULL) && ((program != program_) || force_namespace)) {
-    string package = program->get_namespace("java");
+    string package = get_namespace(program);
     if (!package.empty()) {
       return package + "." + ttype->get_name();
     }
