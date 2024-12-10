@@ -334,6 +334,9 @@ public:
 
   std::string constant_name(std::string name);
 
+  // 在t_java_generator类定义中添加新方法
+  void generate_service_retrofit_interface(t_service* tservice);
+
 private:
   /**
    * File streams
@@ -2682,6 +2685,9 @@ void t_java_generator::generate_service(t_service* tservice) {
   generate_service_server(tservice);
   generate_service_async_server(tservice);
   generate_service_helpers(tservice);
+
+  // 生成Retrofit接口
+  generate_service_retrofit_interface(tservice);
 
   indent_down();
   f_service_ << "}" << endl;
@@ -5139,6 +5145,184 @@ void t_java_generator::generate_javax_generated_annotation(ofstream& out) {
                 << (now->tm_mon + 1) << "-" << setfill('0') << setw(2) << now->tm_mday
                 << "\")" << endl;
   }
+}
+
+// 实现新方法
+void t_java_generator::generate_service_retrofit_interface(t_service* tservice) {
+  // 检查是否有任何函数带有 api 注解
+  bool has_api = false;
+  vector<t_function*> functions = tservice->get_functions();
+  for (vector<t_function*>::iterator f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
+    if ((*f_iter)->annotations_.find("api.get") != (*f_iter)->annotations_.end() ||
+        (*f_iter)->annotations_.find("api.post") != (*f_iter)->annotations_.end() ||
+        (*f_iter)->annotations_.find("api.put") != (*f_iter)->annotations_.end() ||
+        (*f_iter)->annotations_.find("api.delete") != (*f_iter)->annotations_.end()) {
+      has_api = true;
+      break;
+    }
+  }
+
+  // 如果没有 api 注解,直接返回
+  if (!has_api) {
+    return;
+  }
+
+  string extends = "";
+  string extends_iface = "";
+  if (tservice->get_extends() != NULL) {
+    extends = type_name(tservice->get_extends());
+    extends_iface = " extends " + extends + ".RetrofitIface";
+  }
+
+  // 生成接口文档
+  generate_java_doc(f_service_, tservice);
+  f_service_ << indent() << "public interface RetrofitIface" << extends_iface << " {" << endl << endl;
+  indent_up();
+
+  // 为每个带有 api 注解的函数生成方法
+  for (vector<t_function*>::iterator f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
+    t_function* function = *f_iter;
+    
+    // 获取HTTP方法和路径
+    string http_method;
+    string http_path;
+    map<string, string>::iterator it;
+
+    if ((it = function->annotations_.find("api.get")) != function->annotations_.end()) {
+      http_method = "GET";
+      http_path = it->second;
+    } else if ((it = function->annotations_.find("api.post")) != function->annotations_.end()) {
+      http_method = "POST"; 
+      http_path = it->second;
+    } else if ((it = function->annotations_.find("api.put")) != function->annotations_.end()) {
+      http_method = "PUT";
+      http_path = it->second;
+    } else if ((it = function->annotations_.find("api.delete")) != function->annotations_.end()) {
+      http_method = "DELETE";
+      http_path = it->second;
+    } else {
+      // 跳过没有 api 注解的方法
+      continue;
+    }
+
+    string function_name = function->get_name();
+
+    // 生成方法文档
+    generate_java_doc(f_service_, *f_iter);
+
+    // 处理路径参数 - 将:param替换为{param}
+    string retrofit_path = http_path;
+    vector<string> path_params;
+    size_t pos = 0;
+    while ((pos = retrofit_path.find(":", pos)) != string::npos) {
+      size_t param_start = pos + 1;
+      size_t param_end = retrofit_path.find_first_of("/?&", param_start);
+      if (param_end == string::npos) {
+        param_end = retrofit_path.length();
+      }
+      string param_name = retrofit_path.substr(param_start, param_end - param_start);
+      path_params.push_back(param_name);
+      retrofit_path.replace(pos, param_name.length() + 1, "{" + param_name + "}");
+      pos = pos + param_name.length() + 2; // +2 for { and }
+    }
+
+    indent(f_service_) << "@retrofit2.http." << http_method << "(\"" << retrofit_path << "\")" << endl;
+
+    // 生成方法签名
+    indent(f_service_) << "io.reactivex.rxjava3.core.Single<" 
+                      << type_name((*f_iter)->get_returntype()) << "> "
+                      << function_name << "(";
+
+    // 首先添加路径参数
+    bool first = true;
+    for (vector<string>::const_iterator path_iter = path_params.begin(); path_iter != path_params.end(); ++path_iter) {
+      if (first) {
+        first = false;
+      } else {
+        f_service_ << ", ";
+      }
+      f_service_ << "@retrofit2.http.Path(\"" << *path_iter << "\") String " << *path_iter;
+    }
+
+    // 生成其他参数
+    t_struct* arg_struct = (*f_iter)->get_arglist();
+    const vector<t_field*>& fields = arg_struct->get_members();
+    vector<t_field*>::const_iterator fld_iter;
+    
+    // 对于GET/DELETE方法,展开参数对象的所有字段作为查询参数
+    if (http_method == "GET" || http_method == "DELETE") {
+      for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
+        // 检查参数名是否已经作为路径参数使用
+        bool is_path_param = false;
+        for (vector<string>::const_iterator path_iter = path_params.begin(); path_iter != path_params.end(); ++path_iter) {
+          if (*path_iter == (*fld_iter)->get_name()) {
+            is_path_param = true;
+            break;
+          }
+        }
+        if (is_path_param) {
+          continue;
+        }
+
+        // 如果参数是结构体类型,展开其所有字段作为查询参数
+        if ((*fld_iter)->get_type()->is_struct()) {
+          t_struct* param_struct = (t_struct*)((*fld_iter)->get_type());
+          const vector<t_field*>& param_fields = param_struct->get_members();
+          vector<t_field*>::const_iterator param_iter;
+          
+          for (param_iter = param_fields.begin(); param_iter != param_fields.end(); ++param_iter) {
+            if (first) {
+              first = false;
+            } else {
+              f_service_ << ", ";
+            }
+            
+            f_service_ << "@retrofit2.http.Query(\"" << (*param_iter)->get_name() << "\") "
+                      << type_name((*param_iter)->get_type()) << " " << (*param_iter)->get_name();
+          }
+        } else {
+          // 非结构体类型直接作为查询参数
+          if (first) {
+            first = false;
+          } else {
+            f_service_ << ", ";
+          }
+          
+          f_service_ << "@retrofit2.http.Query(\"" << (*fld_iter)->get_name() << "\") "
+                    << type_name((*fld_iter)->get_type()) << " " << (*fld_iter)->get_name();
+        }
+      }
+    } else {
+      // POST/PUT方法使用@Body注解
+      for (fld_iter = fields.begin(); fld_iter != fields.end(); ++fld_iter) {
+        // 检查参数名是否已经作为路径参数使用
+        bool is_path_param = false;
+        for (vector<string>::const_iterator path_iter = path_params.begin(); path_iter != path_params.end(); ++path_iter) {
+          if (*path_iter == (*fld_iter)->get_name()) {
+            is_path_param = true;
+            break;
+          }
+        }
+        if (is_path_param) {
+          continue;
+        }
+
+        if (first) {
+          first = false;
+        } else {
+          f_service_ << ", ";
+        }
+        
+        f_service_ << "@retrofit2.http.Body "
+                  << type_name((*fld_iter)->get_type()) << " " << (*fld_iter)->get_name();
+      }
+    }
+    
+    f_service_ << ");" << endl << endl;
+  }
+
+  indent_down();
+  f_service_ << indent() << "}" << endl << endl;
 }
 
 THRIFT_REGISTER_GENERATOR(
