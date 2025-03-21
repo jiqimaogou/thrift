@@ -5271,6 +5271,19 @@ void t_java_generator::generate_service_retrofit_interface(t_service* tservice) 
           vector<t_field*>::const_iterator param_iter;
           
           for (param_iter = param_fields.begin(); param_iter != param_fields.end(); ++param_iter) {
+            // 检查嵌套参数名是否已经作为路径参数使用
+            bool is_nested_path_param = false;
+            for (vector<string>::const_iterator path_iter = path_params.begin(); path_iter != path_params.end(); ++path_iter) {
+              if (*path_iter == (*param_iter)->get_name()) {
+                is_nested_path_param = true;
+                break;
+              }
+            }
+            
+            if (is_nested_path_param) {
+              continue;
+            }
+            
             if (first) {
               first = false;
             } else {
